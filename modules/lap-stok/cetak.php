@@ -1,96 +1,87 @@
 <?php
-session_start();
-ob_start();
-
-// Panggil koneksi database.php untuk koneksi database
+require_once '../../vendor/autoload.php';
 require_once "../../config/database.php";
-// panggil fungsi untuk format tanggal
 include "../../config/fungsi_tanggal.php";
-// panggil fungsi untuk format rupiah
 include "../../config/fungsi_rupiah.php";
+require('../../assets/plugins/fpdf/fpdf.php');
+
+use FPDF;
+
+class PDF extends FPDF
+{
+    function Header()
+    {
+        $this->SetFont('Arial', 'B', 12);
+        $this->Cell(0, 10, 'LAPORAN STOK OBAT', 0, 1, 'C');
+        $this->Ln(10);
+    }
+
+    function FancyTable($header, $data, $columnWidths)
+    {
+        $this->SetFillColor(232, 235, 239);
+        $this->SetFont('Arial', 'B', 10);
+
+        // Set column widths
+        foreach ($columnWidths as $width) {
+            if (!empty($header)) {
+                $this->Cell($width, 7, '', 0);
+            }
+        }
+        $this->Ln();
+
+        // Set header
+        $this->SetFont('Arial', 'B', 10);
+        foreach ($header as $key => $col) {
+            $this->Cell($columnWidths[$key], 7, $col, 1, 0, 'C');
+        }
+        $this->Ln();
+
+        // Set data
+        $this->SetFont('Arial', '', 10);
+        foreach ($data as $row) {
+            foreach ($row as $key => $col) {
+                $this->Cell($columnWidths[$key], 7, $col, 1, 0, 'C');
+            }
+            $this->Ln();
+        }
+    }
+
+}
 
 $hari_ini = date("d-m-Y");
-
 $no = 1;
-// fungsi query untuk menampilkan data dari tabel obat
+
 $query = mysqli_query($mysqli, "SELECT kode_obat,nama_obat,harga_beli,harga_jual,satuan,stok FROM is_obat ORDER BY nama_obat ASC")
-                                or die('Ada kesalahan pada query tampil Data Obat: '.mysqli_error($mysqli));
-$count  = mysqli_num_rows($query);
-?>
-<html xmlns="http://www.w3.org/1999/xhtml"> <!-- Bagian halaman HTML yang akan konvert -->
-    <head>
-        <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />
-        <title>LAPORAN STOK OBAT</title>
-        <link rel="stylesheet" type="text/css" href="../../assets/css/laporan.css" />
-    </head>
-    <body>
-        <div id="title">
-            LAPORAN STOK OBAT 
-        </div>
-        
-        <hr><br>
+    or die('Ada kesalahan pada query tampil Data Obat: ' . mysqli_error($mysqli));
 
-        <div id="isi">
-            <table width="100%" border="0.3" cellpadding="0" cellspacing="0">
-                <thead style="background:#e8ecee">
-                    <tr class="tr-title">
-                        <th height="20" align="center" valign="middle">NO.</th>
-                        <th height="20" align="center" valign="middle">KODE OBAT</th>
-                        <th height="20" align="center" valign="middle">NAMA OBAT</th>
-                        <th height="20" align="center" valign="middle">HARGA BELI</th>
-                        <th height="20" align="center" valign="middle">HARGA JUAL</th>
-                        <th height="20" align="center" valign="middle">STOK</th>
-                        <th height="20" align="center" valign="middle">SATUAN</th>
-                    </tr>
-                </thead>
-                <tbody>
-        <?php
-        // tampilkan data
-        while ($data = mysqli_fetch_assoc($query)) {
-            $harga_beli = format_rupiah($data['harga_beli']);
-            $harga_jual = format_rupiah($data['harga_jual']);
-            // menampilkan isi tabel dari database ke tabel di aplikasi
-            echo "  <tr>
-                        <td width='40' height='13' align='center' valign='middle'>$no</td>
-                        <td width='80' height='13' align='center' valign='middle'>$data[kode_obat]</td>
-                        <td style='padding-left:5px;' width='180' height='13' valign='middle'>$data[nama_obat]</td>
-                        <td style='padding-right:10px;' width='80' height='13' align='right' valign='middle'>Rp. $harga_beli</td>
-                        <td style='padding-right:10px;' width='80' height='13' align='right' valign='middle'>Rp. $harga_jual</td>
-                        <td style='padding-right:10px;' width='80' height='13' align='right' valign='middle'>$data[stok]</td>
-                        <td width='80' height='13' align='center' valign='middle'>$data[satuan]</td>
-                    </tr>";
-            $no++;
-        }
-        ?>  
-                </tbody>
-            </table>
+$header = array('NO.', 'KODE OBAT', 'NAMA OBAT', 'HARGA BELI', 'HARGA JUAL', 'STOK', 'SATUAN');
+$data = array();
 
-            <div id="footer-tanggal">
-                Bandarlampung, <?php echo tgl_eng_to_ind("$hari_ini"); ?>
-            </div>
-            <div id="footer-jabatan">
-                Pimpinan
-            </div>
-            
-            <div id="footer-nama">
-                Indra Setyawantoro, S.Kom.
-            </div>
-        </div>
-    </body>
-</html><!-- Akhir halaman HTML yang akan di konvert -->
-<?php
-$filename="LAPORAN STOK OBAT.pdf"; //ubah untuk menentukan nama file pdf yang dihasilkan nantinya
-//==========================================================================================================
-$content = ob_get_clean();
-$content = '<page style="font-family: freeserif">'.($content).'</page>';
-// panggil library html2pdf
-require_once('../../assets/plugins/html2pdf_v4.03/html2pdf.class.php');
-try
-{
-    $html2pdf = new HTML2PDF('P','F4','en', false, 'ISO-8859-15',array(10, 10, 10, 10));
-    $html2pdf->setDefaultFont('Arial');
-    $html2pdf->writeHTML($content, isset($_GET['vuehtml']));
-    $html2pdf->Output($filename);
+while ($row = mysqli_fetch_assoc($query)) {
+    $harga_beli = format_rupiah($row['harga_beli']);
+    $harga_jual = format_rupiah($row['harga_jual']);
+
+    $data[] = array(
+        $no,
+        $row['kode_obat'],
+        $row['nama_obat'],
+        "Rp. $harga_beli",
+        "Rp. $harga_jual",
+        $row['stok'],
+        $row['satuan']
+    );
+
+    $no++;
 }
-catch(HTML2PDF_exception $e) { echo $e; }
+
+$pdf = new PDF();
+$pdf->AddPage();
+$columnWidths = array(10, 30, 40, 35, 35, 20, 20);
+
+$pdf->FancyTable($header, $data, $columnWidths);
+
+$filename = "LAPORAN STOK OBAT.pdf";
+
+ob_end_clean();
+$pdf->Output($filename, 'I');
 ?>
